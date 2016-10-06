@@ -39,7 +39,7 @@ uid(Sock, IRI, Uid) ->
 %%
 %%
 put(Sock, Spock) ->
-   #{s := Uid} = Fact = fact(Sock, Spock),
+   Fact = relog_codec:encode(Sock, Spock),
    eredis:qp(Sock, [
       ["ZADD", scalar:c(X), "0", relog_codec:encode_spo(X, Fact)] || X <- [spo, sop, pso, pos, ops, osp]
    ]).   
@@ -48,23 +48,6 @@ put(Sock, Spock) ->
    %% use zadd with 0 see lex index
    %% http://redis.io/topics/indexes
    %% how to handle c - k ?
-
-%%
-%% encode statement, replace urn with unique identity
-fact(FD, Spock) ->
-   maps:map(
-      fun
-      (_, {iri, _} = IRI) ->
-         {ok, Uid} = uid(FD, IRI), 
-         Uid;
-      (_, {iri, _, _} = IRI) ->
-         {ok, Uid} = uid(FD, IRI), 
-         Uid;
-      (_, Val) ->
-         Val
-      end,
-      Spock
-   ).
 
 
 

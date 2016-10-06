@@ -4,8 +4,11 @@
 -export([
    socket/2,
    uid/2,
+   iri/2,
    put/2,
-   match/2
+   match/2,
+   q/2,
+   f/1
 ]).
 
 
@@ -18,22 +21,43 @@ start() ->
 socket(Host, Port) ->
    eredis:start_link(Host, Port).
 
+
 %%
 %% associate iri with unique identity or return existed one
--spec uid(sock(), semantic:iri()) -> {ok, uid:g()} | {error, any()}.
+-spec uid(sock(), semantic:iri()) -> {ok, uid:g()} | {error, _}.
 
 uid(Sock, IRI) ->
    relog_writer:uid(Sock, IRI).
 
 
+%%
+%% lookup iri associated with unique identity
+-spec iri(sock(), uid:g()) -> {ok, semantic:iri()} | {error, _}.
+
+iri(Sock, Uid) ->
+   relog_reader:iri(Sock, Uid).
 
 
-
-
+%%
+%%
 -spec put(sock(), semantic:spock()) -> {ok, uid:l()}.
 
 put(Sock, Spock) ->
    relog_writer:put(Sock, Spock).
+
+
+%%
+%%
+q(Expr, Sock) ->
+   stream:map(fun(X) -> relog_codec:decode(Sock, X) end, datalog:q(Expr, Sock)).   
+
+
+%%
+%% sigma function   
+%% @todo:
+%%   * detect iri and replace them to compact form
+f(Expr) ->
+   relog_reader:sigma(Expr).
 
 
 %%

@@ -3,10 +3,23 @@
 -module(relog_reader).
 
 -export([
+   iri/2,
    sigma/1
 ]).
 
+%%
+%%
+iri(Sock, {uid, _, _, _} = Uid) ->
+   case eredis:q(Sock, ["GET", uid:encode(Uid)]) of
+      {ok, undefined} ->   
+         {ok, Uid};
+      {ok, IRI} ->
+         {ok, relog_codec:decode_iri(IRI)}
+   end.
 
+
+%%
+%%
 sigma(Expr) ->
    fun(X) ->
       fun(Stream) ->

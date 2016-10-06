@@ -3,6 +3,8 @@
 -module(relog_codec).
 
 -export([
+   encode/2,
+   decode/2,
    encode_iri/1,
    decode_iri/1,
    encode_spo/2,
@@ -10,6 +12,35 @@
    encode_term/1,
    decode_term/1
 ]).
+
+%%
+%% encode statement, replace urn with unique identity
+encode(Sock, Spock) ->
+   maps:map(
+      fun
+      (_, {iri, _} = IRI) ->
+         {ok, Uid} = relog:uid(Sock, IRI), 
+         Uid;
+      (_, {iri, _, _} = IRI) ->
+         {ok, Uid} = relog:uid(Sock, IRI), 
+         Uid;
+      (_, Any) ->
+         Any
+      end,
+      Spock
+   ).
+
+decode(Sock, Spock) ->
+   maps:map(
+      fun
+      (_, {uid, _, _, _} = Uid) ->
+         {ok, IRI} = relog:iri(Sock, Uid),
+         IRI;
+      (_, Any) ->
+         Any
+      end,
+      Spock
+   ).
 
 %%
 %%
