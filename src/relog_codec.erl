@@ -10,7 +10,9 @@
    encode_spo/2,
    decode_spo/2,
    encode_term/1,
-   decode_term/1
+   decode_term/1,
+
+   encode_term/2
 ]).
 
 %%
@@ -47,9 +49,9 @@ decode(Sock, Spock) ->
 encode_iri({iri, Url}) ->
    Url;   
 encode_iri({iri, Prefix, Suffix}) ->
-   <<"urn:", Prefix/binary, $:, Suffix/binary>>.
+   <<"_:", Prefix/binary, $:, Suffix/binary>>.
 
-decode_iri(<<"urn:", IRI/binary>>) ->
+decode_iri(<<"_:", IRI/binary>>) ->
    [Prefix, Suffix] = binary:split(IRI, <<$:>>),
    {iri, Prefix, Suffix};
 
@@ -57,7 +59,7 @@ decode_iri(IRI) ->
    {iri, IRI}.
 
 %%
-%%
+%% @deprecated: encode - decode is redundant in context of new indexes
 encode_spo(spo, #{s := S, p := P, o := O}) -> 
    [encode_term(S), 16#ff, encode_term(P), 16#ff, encode_term(O)];
 encode_spo(sop, #{s := S, p := P, o := O}) -> 
@@ -93,22 +95,34 @@ decode_spo(osp, Val) ->
 
 %%
 %%
+encode_term({uid, _, _} = Uid) ->
+   <<0, (uid:encode(Uid))/binary>>;
 encode_term({uid, _, _, _} = Uid) ->
-   escape(<<0, (uid:encode(Uid))/binary>>);
+   % escape(<<0, (uid:encode(Uid))/binary>>);
+   <<0, (uid:encode(Uid))/binary>>;
 
 encode_term(Any) ->
    <<131, Val/binary>> = erlang:term_to_binary(Any, [{minor_version, 1}]),
-   escape(Val).
+   % escape(Val).
+   Val.
+
+encode_term(<<"binary">>, X) -> scalar:s(X);
+encode_term(<<"en">>, X) -> scalar:s(X);
+encode_term(<<"integer">>, X) -> <<X:32>>;
+encode_term(<<"datetime">>, {A, B, C}) -> <<A:20, B:20, C:24>>;
+encode_term(<<"rel">>, X) -> encode_term(X).
 
 
 decode_term(<<0, Uid/binary>>) ->
-   uid:decode( unescape(Uid) );
+   % uid:decode( unescape(Uid) );
+   uid:decode( Uid );
 
 decode_term(Val) ->
-   erlang:binary_to_term(<<131, (unescape(Val))/binary>>).
+   % erlang:binary_to_term(<<131, (unescape(Val))/binary>>).
+   erlang:binary_to_term(<<131, Val/binary>>).
 
 
-%%
+%% @todo: escape violate an order
 %%
 escape(Val) ->
    << <<(if X >= 16#f0, X =< 16#ff -> <<16#f0, (16#f0 bxor X)>>; true -> <<X>> end)/binary>> 

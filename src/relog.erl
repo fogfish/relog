@@ -14,9 +14,17 @@
 
 -type sock() :: _.
 
-start() ->
-   applib:boot(?MODULE, []).
 
+start() ->
+   applib:boot(?MODULE, []),
+   clue:define(meter, put, 10000),
+   clue:define(counter, n),
+   clue:define(counter, size).
+
+
+%%
+%%
+-spec socket(string(), integer()) -> {ok, sock()} | {error, _}.
 
 socket(Host, Port) ->
    eredis:start_link(Host, Port).
@@ -39,7 +47,7 @@ iri(Sock, Uid) ->
 
 
 %%
-%%
+%% put type-safe knowledge statement to storage
 -spec put(sock(), semantic:spock()) -> {ok, uid:l()}.
 
 put(Sock, Spock) ->
@@ -47,7 +55,7 @@ put(Sock, Spock) ->
 
 
 %%
-%%
+%% execute query
 q(Expr, Sock) ->
    stream:map(fun(X) -> relog_codec:decode(Sock, X) end, datalog:q(Expr, Sock)).   
 
@@ -153,36 +161,59 @@ fact(FD, Spock) ->
 match(Sock, Spock) ->
    Fact = fact(Sock, Spock),
    Uid  = key(Fact),
+   {Key, Pat} = pattern(Uid, Fact),
    maps:fold(fun filter/3,
       stream:map(
          fun(X) ->
-            relog_codec:decode_spo(Uid, X)
+            decode(Uid, Key, X)
+            % relog_codec:decode_spo(Uid, X)
          end,
-         relog_stream:new(Sock, Uid, scalar:s(pattern(Uid, Fact)))
+         relog_stream:new(Sock, Key, scalar:s(Pat))
       ),
       Fact
    ).
 
-% sin(Sock, Uid, Pat) ->
-%    {ok, L} = eredis:q(Sock, ["ZRANGEBYLEX", Uid, <<$[,Pat/binary>>, "+"]),
-%    % io:format("==> ~p ~p~n", [Uid, R]),
-%    stream:build([{X, undefined} || X <- L]).
-
-
 %%
 %% encode match prefix
 pattern(spo, Pattern) ->
-   join(16#ff, [pat(s, Pattern), pat(p, Pattern), pat(o, Pattern)]);
+   {<<$1, (pat(s, Pattern))/binary>>, [pat(p, Pattern), pat(o, Pattern)]};
 pattern(sop, Pattern) ->
-   join(16#ff, [pat(s, Pattern), pat(o, Pattern), pat(p, Pattern)]);
+   {<<$2, (pat(s, Pattern))/binary>>, [pat(o, Pattern), pat(p, Pattern)]};
 pattern(pso, Pattern) ->
-   join(16#ff, [pat(p, Pattern), pat(s, Pattern), pat(o, Pattern)]);
+   {<<$3, (pat(p, Pattern))/binary>>, [pat(s, Pattern), pat(o, Pattern)]};
 pattern(pos, Pattern) ->
-   join(16#ff, [pat(p, Pattern), pat(o, Pattern), pat(s, Pattern)]);
+   {<<$4, (pat(p, Pattern))/binary>>, [pat(o, Pattern), pat(s, Pattern)]};
 pattern(ops, Pattern) ->
-   join(16#ff, [pat(o, Pattern), pat(p, Pattern), pat(s, Pattern)]);
+   {<<$5, "lit">>, [pat(o, Pattern), pat(p, Pattern), pat(s, Pattern)]};
 pattern(osp, Pattern) ->
-   join(16#ff, [pat(o, Pattern), pat(s, Pattern), pat(p, Pattern)]).
+   {<<$6, "lit">>, [pat(o, Pattern), pat(s, Pattern), pat(p, Pattern)]}.
+
+%% 12 length + 1 (magic byte)
+decode(spo, <<_:8, S/binary>>, <<P:13/binary, O/binary>>) ->
+   #{s => relog_codec:decode_term(S), p => relog_codec:decode_term(P), o => relog_codec:decode_term(O)};
+decode(sop, <<_:8, S/binary>>, X) ->
+   Len = size(X) - 13,
+   <<O:Len/binary, P:13/binary>> = X,
+   #{s => relog_codec:decode_term(S), p => relog_codec:decode_term(P), o => relog_codec:decode_term(O)};
+
+decode(pos, <<_:8, P/binary>>, X) ->
+   Len = size(X) - 13,
+   <<O:Len/binary, S:13/binary>> = X,
+   #{s => relog_codec:decode_term(S), p => relog_codec:decode_term(P), o => relog_codec:decode_term(O)};
+decode(pso, <<_:8, P/binary>>, <<S:13/binary, O/binary>>) ->
+   #{s => relog_codec:decode_term(S), p => relog_codec:decode_term(P), o => relog_codec:decode_term(O)};
+
+decode(ops, _, X) ->
+   Len = size(X) - 2 * 13,
+   <<O:Len/binary, P:13/binary, S:13/binary>> = X,
+   #{s => relog_codec:decode_term(S), p => relog_codec:decode_term(P), o => relog_codec:decode_term(O)};
+decode(osp, _, X) ->
+   Len = size(X) - 2 * 13,
+   <<O:Len/binary, S:13/binary, P:13/binary>> = X,
+   #{s => relog_codec:decode_term(S), p => relog_codec:decode_term(P), o => relog_codec:decode_term(O)}.
+
+
+
 
 join(X, [H|T]) ->
    [H | [[X,Y] || Y <- T, Y =/= [] ]].

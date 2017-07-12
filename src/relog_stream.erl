@@ -18,7 +18,7 @@ new(Sock, Key, Pattern) ->
             sock  => Sock,
             q     => ["ZRANGEBYLEX", Key, <<$[, Pattern/binary>>, "+"],
             from  => 0,
-            size  => 10000 
+            size  => 1000 
          }
       )
    ).

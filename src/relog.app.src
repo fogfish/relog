@@ -9,6 +9,7 @@
         ,stdlib
         ,semantic
         ,eredis
+        ,clue
       ]},
       {mod, {relog_app, []}},
       {env, []}
