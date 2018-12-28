@@ -1,56 +1,69 @@
 %%
 %%
 -module(relog_writer).
+-include_lib("semantic/include/semantic.hrl").
 
 -export([
-   uid/2,
-   put/2
+   uid/2
+,  append/3
 ]).
 
 %%
 %%
-uid(Sock, IRI)
- when is_tuple(IRI) ->
+uid(Sock, {iri, _} = IRI) ->
    uid(Sock, relog_codec:encode_iri(IRI));
-
+uid(Sock, {iri, _, _} = IRI) ->
+   uid(Sock, relog_codec:encode_iri(IRI));
 uid(Sock, IRI)
  when is_binary(IRI) ->
-   % Len = size(IRI) - 1,
-   % <<A:Len/binary, B/binary>> = IRI,
    case eredis:q(Sock, ["HGET", "iri", IRI]) of
-   % case eredis:q(Sock, ["HGET", A, B]) of
-      {ok, undefined} ->   
-         % uid(Sock, IRI, uid:encode(uid:g()));
-         uid(Sock, IRI, uid:encode(uid:l()));
+      {ok, undefined} ->
+         uid(Sock, IRI, uid:encode(uid:g()));
       {ok, Uid} ->
-         {ok, uid:decode(Uid)}
+         {ok, Uid}
    end.
 
 uid(Sock, IRI, Uid) ->
-   % Leni = size(IRI) - 1,
-   Lenu = size(Uid) - 2,
-   % <<Ai:Leni/binary, Bi/binary>> = IRI,
-   <<Au:Lenu/binary, Bu/binary>> = Uid,
    case 
       eredis:qp(Sock, [
          ["HSETNX", "iri", IRI, Uid],
          ["HSETNX", "uid", Uid, IRI]
-         % ["SET", IRI, Uid, "NX"],
-         % ["HSETNX", Au, Bu, IRI]
       ]) 
    of
-   % case 
-   %    eredis:qp(Sock, [
-   %       ["SET", IRI, Uid, "NX"],
-   %       ["SET", Uid, IRI, "NX"]
-   %    ]) 
-   % of
-      % already exists
       [{ok, undefined} | _] ->
          uid(Sock, IRI);
       [{ok, _} | _] ->
          {ok, Uid}
    end.
+
+%%
+%%
+append(Sock, {_, _, _} = Fact, Timeout) ->
+   append(Sock, semantic:typed(Fact), Timeout);
+
+append(Sock, #{s := S, p := P, o:= O, type := Type} = Fact, Timeout) ->
+   ReS = relog_codec:encode(Sock, ?XSD_ANYURI, S),
+   ReP = relog_codec:encode(Sock, ?XSD_ANYURI, P),
+   ReO = relog_codec:encode(Sock, Type, O),
+   Len = erlang:byte_size(ReO),
+   ReT = relog_codec:encode_type(Type),
+   %% @todo: validate that each index written 
+   eredis:qp(Sock, [
+      ["ZADD", <<$1, ReS/binary>>, "0", <<ReP/binary, 16#ff, ReT:8, ReO/binary>>],
+      ["ZADD", <<$2, ReS/binary>>, "0", <<ReT:8, ReO/binary, 16#ff, ReP/binary>>],
+
+      ["ZADD", <<$3, ReP/binary>>, "0", <<ReS/binary, 16#ff, ReT:8, ReO/binary>>],
+      ["ZADD", <<$4, ReP/binary>>, "0", <<ReT:8, ReO/binary, 16#ff, ReS/binary>>],
+
+      ["ZADD", <<$5, ReT:8, ReO/binary>>, "0", <<ReP/binary, 16#ff, ReS/binary>>],
+      ["ZADD", <<$6, ReT:8, ReO/binary>>, "0", <<ReS/binary, 16#ff, ReP/binary>>]      
+   ]).
+
+
+
+
+
+
 
 %%
 %%
