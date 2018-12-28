@@ -1,15 +1,16 @@
 {application, relog,
    [
       {description, "semantic redis interface"},
-      {vsn,         "0.0.0"},
+      {vsn,         "0.2.0"},
       {modules,     []},
       {registered,  []},
       {applications,[
          kernel
-        ,stdlib
-        ,semantic
-        ,eredis
-        ,clue
+      ,  stdlib
+      ,  datum
+      ,  datalog
+      ,  semantic
+      ,  eredis
       ]},
       {mod, {relog_app, []}},
       {env, []}

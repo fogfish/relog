@@ -1,4 +1,17 @@
 %%
+%%   Copyright 2016 Dmitry Kolesnikov, All Rights Reserved
+%%
+%%   Licensed under the Apache License, Version 2.0 (the "License");
+%%   you may not use this file except in compliance with the License.
+%%   You may obtain a copy of the License at
+%%
+%%       http://www.apache.org/licenses/LICENSE-2.0
+%%
+%%   Unless required by applicable law or agreed to in writing, software
+%%   distributed under the License is distributed on an "AS IS" BASIS,
+%%   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%%   See the License for the specific language governing permissions and
+%%   limitations under the License.
 %%
 -module(relog_writer).
 -include_lib("semantic/include/semantic.hrl").
@@ -49,85 +62,12 @@ append(Sock, #{s := S, p := P, o:= O, type := Type} = Fact, Timeout) ->
    ReT = relog_codec:encode_type(Type),
    %% @todo: validate that each index written 
    eredis:qp(Sock, [
-      ["ZADD", <<$1, ReS/binary>>, "0", <<ReP/binary, 16#ff, ReT:8, ReO/binary>>],
-      ["ZADD", <<$2, ReS/binary>>, "0", <<ReT:8, ReO/binary, 16#ff, ReP/binary>>],
+      ["ZADD", <<$1, ReS/binary>>, "0", <<ReP:12/binary, ReT:8, ReO/binary>>],
+      ["ZADD", <<$2, ReS/binary>>, "0", <<ReT:8, Len:32, ReO/binary, ReP:12/binary>>],
 
-      ["ZADD", <<$3, ReP/binary>>, "0", <<ReS/binary, 16#ff, ReT:8, ReO/binary>>],
-      ["ZADD", <<$4, ReP/binary>>, "0", <<ReT:8, ReO/binary, 16#ff, ReS/binary>>],
+      ["ZADD", <<$3, ReP/binary>>, "0", <<ReS:12/binary, ReT:8, ReO/binary>>],
+      ["ZADD", <<$4, ReP/binary>>, "0", <<ReT:8, Len:32, ReO/binary, ReS:12/binary>>],
 
-      ["ZADD", <<$5, ReT:8, ReO/binary>>, "0", <<ReP/binary, 16#ff, ReS/binary>>],
-      ["ZADD", <<$6, ReT:8, ReO/binary>>, "0", <<ReS/binary, 16#ff, ReP/binary>>]      
+      ["ZADD", <<$5, ReT:8, ReO/binary>>, "0", <<ReP:12/binary, ReS:12/binary>>],
+      ["ZADD", <<$6, ReT:8, ReO/binary>>, "0", <<ReS:12/binary, ReP:12/binary>>]      
    ]).
-
-
-
-
-
-
-
-%%
-%%
-put(Sock, Spock) ->
-   % @todo: use smart type detection
-   T = scalar:s( semantic:typeof(Spock) ),
-   % T = <<"lit">>,
-   #{s := Sx, p := Px, o := Ox} = relog_codec:encode(Sock, Spock),
-   S = relog_codec:encode_term(Sx),
-   P = relog_codec:encode_term(Px),
-   O = relog_codec:encode_term(T, Ox),
-   % io:format("=> ~p ~p ~p~n", [S, P, O]),
-   clue:inc(put),
-   clue:inc(n),
-   %% @todo: write object rel to special index
-try
-   case T of
-      <<"rel">> ->
-         eredis:qp(Sock, [
-            ["ZADD", <<$1, S/binary>>, "0", <<P/binary, O/binary>>],
-            ["ZADD", <<$2, S/binary>>, "0", <<O/binary, P/binary>>],
-            % ["ZADD", <<$1, S/binary>>, "0", <<O/binary, P/binary>>],
-
-            ["ZADD", <<$3, P/binary>>, "0", <<S/binary, O/binary>>],
-            ["ZADD", <<$4, P/binary>>, "0", <<O/binary, S/binary>>],
-            % ["ZADD", <<$3, P/binary>>, "0", <<O/binary, S/binary>>],
-
-            ["ZADD", <<$5, O/binary>>, "0", <<P/binary, S/binary>>],
-            ["ZADD", <<$6, O/binary>>, "0", <<S/binary, P/binary>>]      
-            % ["ZADD", <<$5, O/binary>>, "0", <<S/binary, P/binary>>]      
-         ]); 
-      _ -> 
-         eredis:qp(Sock, [
-            ["ZADD", <<$1, S/binary>>, "0", <<P/binary, O/binary>>],
-            ["ZADD", <<$2, S/binary>>, "0", <<O/binary, P/binary>>],
-            % ["ZADD", <<$1, S/binary>>, "0", <<O/binary, P/binary>>],
-
-            ["ZADD", <<$3, P/binary>>, "0", <<S/binary, O/binary>>],
-            ["ZADD", <<$4, P/binary>>, "0", <<O/binary, S/binary>>],
-            % ["ZADD", <<$3, P/binary>>, "0", <<O/binary, S/binary>>],
-
-            ["ZADD", <<$5, T/binary>>, "0", <<O/binary, P/binary, S/binary>>],
-            ["ZADD", <<$6, T/binary>>, "0", <<O/binary, S/binary, P/binary>>]      
-            % ["ZADD", <<$5, T/binary>>, "0", <<O/binary, S/binary, P/binary>>]      
-         ])
-   end
-catch _:_ ->
-   io:format("==> ~p ~p ~p~n", [S, P, O])
-end.
-   % eredis:q_noreply(Sock, ["ZADD", scalar:c(spo), "0", relog_codec:encode_spo(spo, Fact)]),
-   % eredis:q_noreply(Sock, ["ZADD", scalar:c(sop), "0", relog_codec:encode_spo(sop, Fact)]),
-   % eredis:q_noreply(Sock, ["ZADD", scalar:c(pso), "0", relog_codec:encode_spo(pso, Fact)]),
-   % eredis:q_noreply(Sock, ["ZADD", scalar:c(pos), "0", relog_codec:encode_spo(pos, Fact)]),
-   % eredis:q_noreply(Sock, ["ZADD", scalar:c(ops), "0", relog_codec:encode_spo(ops, Fact)]),
-   % eredis:q_noreply(Sock, ["ZADD", scalar:c(osp), "0", relog_codec:encode_spo(osp, Fact)]).
-   % eredis:qp(Sock, [
-   %    ["ZADD", scalar:c(X), "0", relog_codec:encode_spo(X, Fact)] || X <- [spo, sop, pso, pos, ops, osp]
-   % ]).   
-
-   %% use redis pipeline for hex index update
-   %% use zadd with 0 see lex index
-   %% http://redis.io/topics/indexes
-   %% how to handle c - k ?
-
-
-
-

@@ -1,4 +1,17 @@
 %%
+%%   Copyright 2016 Dmitry Kolesnikov, All Rights Reserved
+%%
+%%   Licensed under the Apache License, Version 2.0 (the "License");
+%%   you may not use this file except in compliance with the License.
+%%   You may obtain a copy of the License at
+%%
+%%       http://www.apache.org/licenses/LICENSE-2.0
+%%
+%%   Unless required by applicable law or agreed to in writing, software
+%%   distributed under the License is distributed on an "AS IS" BASIS,
+%%   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%%   See the License for the specific language governing permissions and
+%%   limitations under the License.
 %%
 -module(relog_reader).
 -include_lib("semantic/include/semantic.hrl").
@@ -44,37 +57,37 @@ match(Sock, #{s := S, p := P, o := O, type := Type} = Pattern) ->
 %%
 %% encode match prefix
 pattern(spo, S, P, O, T) ->
-   {<<$1, S/binary>>, add(P, <<T, O/binary>>)};
+   {<<$1, S/binary>>, <<P/binary, T:8, O/binary>>};
 pattern(sop, S, P, O, T) ->
-   {<<$2, S/binary>>, add(<<T, O/binary>>, P)};
+   {<<$2, S/binary>>, <<(object(T, O))/binary, P/binary>>};
 pattern(pso, S, P, O, T) ->
-   {<<$3, P/binary>>, add(S, <<T, O/binary>>)};
+   {<<$3, P/binary>>, <<S/binary, T:8, O/binary>>};
 pattern(pos, S, P, O, T) ->
-   {<<$4, P/binary>>, add(<<T, O/binary>>, S)};
+   {<<$4, P/binary>>, <<(object(T, O))/binary, S/binary>>};
 pattern(ops, S, P, O, T) ->
-   {<<$5, T, O/binary>>, add(P, S)};
+   {<<$5, T, O/binary>>, <<P/binary, S/binary>>};
 pattern(osp, S, P, O, T) ->
-   {<<$6, T, O/binary>>, add(S, P)}.
+   {<<$6, T, O/binary>>, <<S/binary, P/binary>>}.
 
-add(<<>>, X) -> X;
-add(X, <<>>) -> X;
-add(X, Y) -> <<X/binary, 16#ff, Y/binary>>.
+object(T, <<>>) -> <<T:8>>;
+object(T, O) -> <<T:8, (erlang:byte_size(O)):32, O/binary>>.
+
 
 %%
 %%
-decode(Sock, spo, <<$1, S/binary>>, <<P:12/binary, 16#ff, T:8, O/binary>>) ->
+decode(Sock, spo, <<$1, S/binary>>, <<P:12/binary, T:8, O/binary>>) ->
    decode(Sock, S, P, O, relog_codec:decode_type(T));
-decode(Sock, sop, <<$2, S/binary>>, Value) ->
-   [<<T:8, O/binary>>, P] = binary:split(Value, <<16#ff>>),
+decode(Sock, sop, <<$2, S/binary>>, <<T:8, Len:32, Suffix/binary>>) ->
+   <<O:Len/binary, P:12/binary>> = Suffix,
    decode(Sock, S, P, O, relog_codec:decode_type(T));
-decode(Sock, pso, <<$3, P/binary>>, <<S:12/binary, 16#ff, T:8, O:12/binary>>) ->
+decode(Sock, pso, <<$3, P/binary>>, <<S:12/binary, T:8, O:12/binary>>) ->
    decode(Sock, S, P, O, relog_codec:decode_type(T));
-decode(Sock, sop, <<$4, P/binary>>, Value) ->
-   [<<T:8, O/binary>>, S] = binary:split(Value, <<16#ff>>),
+decode(Sock, sop, <<$4, P/binary>>, <<T:8, Len:32, Suffix/binary>>) ->
+   <<O:Len/binary, S:12/binary>> = Suffix,
    decode(Sock, S, P, O, relog_codec:decode_type(T));
-decode(Sock, ops, <<$5, T:8, O/binary>>, <<P:12/binary, 16#ff, S/binary>>) ->
+decode(Sock, ops, <<$5, T:8, O/binary>>, <<P:12/binary, S/binary>>) ->
    decode(Sock, S, P, O, relog_codec:decode_type(T));
-decode(Sock, osp, <<$6, T:8, O/binary>>, <<S:12/binary, 16#ff, P/binary>>) ->
+decode(Sock, osp, <<$6, T:8, O/binary>>, <<S:12/binary, P/binary>>) ->
    decode(Sock, S, P, O, relog_codec:decode_type(T)).
 
 decode(Sock, S, P, O, Type) ->
