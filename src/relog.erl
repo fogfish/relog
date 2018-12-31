@@ -32,9 +32,6 @@
 ]).
 
 %%
-%% @todo
-%%   - protected against IRI/UID overflow attack
-
 -type sock() :: _.
 
 %%
