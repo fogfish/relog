@@ -58,9 +58,9 @@ append(Sock, {_, _, _} = Fact, Timeout) ->
 
 append(Sock, #{s := S, p := P, o := O, type := T} = Fact, Timeout) ->
    [either ||
-      Sx <- relog_codec:encode(Sock, ?XSD_ANYURI, S),
-      Px <- relog_codec:encode(Sock, ?XSD_ANYURI, P),
-      Ox <- relog_codec:encode(Sock, T, O),
+      Sx <- relog_codec:create(Sock, ?XSD_ANYURI, S),
+      Px <- relog_codec:create(Sock, ?XSD_ANYURI, P),
+      Ox <- relog_codec:create(Sock, T, O),
       cats:sequence(
          eredis:qp(Sock, [
             ["ZADD", <<$1, Sx/binary>>, "0", <<Px:13/binary, Ox/binary>>],

@@ -55,7 +55,7 @@ socket(Host, Port) ->
 -spec uid(sock(), semantic:iri()) -> datum:either( binary() ).
 
 uid(Sock, IRI) ->
-   relog_writer:uid(Sock, IRI).
+   relog_reader:uid(Sock, IRI).
 
 %%
 %% lookup urn or uid associated with unique identity

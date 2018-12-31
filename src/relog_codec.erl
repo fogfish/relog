@@ -21,83 +21,85 @@
 -include_lib("semantic/include/semantic.hrl").
 
 -export([
-   encode/2
+   typeof/1
+,  create/3
 ,  encode/3
 ,  decode/2
 ]).
+
+-define(whildcard(X), (X =:= '_' orelse is_list(X))).
+
+%%
+%%
+typeof(<<"iri:", _/binary>>) -> ?XSD_ANYURI;
+typeof(<<"iri+", _/binary>>) -> ?XSD_ANYURI;
+typeof(X) when is_binary(X)  -> ?XSD_STRING; 
+typeof(X) when is_integer(X) -> ?XSD_INTEGER;
+typeof(_) -> undefined. 
+
+%%
+%%
+create(Sock, ?XSD_ANYURI, {iri, _} = IRI) ->
+   [either ||
+      relog_writer:uid(Sock, IRI)
+   ,  cats:unit(<<0:8, _/binary>>)
+   ];
+create(Sock, ?XSD_ANYURI, {iri, _, _} = IRI) ->
+   [either ||
+      relog_writer:uid(Sock, IRI)
+   ,  cats:unit(<<0:8, _/binary>>)
+   ];
+create(Sock, ?XSD_ANYURI, IRI)
+ when is_binary(IRI) ->
+   [either ||
+      relog_writer:uid(Sock, IRI)
+   ,  cats:unit(<<0:8, _/binary>>)
+   ];
+create(Sock, Type, Val) ->
+   encode(Sock, Type, Val).
 
 %%
 %%
 encode(Sock, ?XSD_ANYURI, {iri, _} = IRI) ->
    [either ||
-      relog:uid(Sock, IRI)
+      relog_reader:uid(Sock, IRI)
    ,  cats:unit(<<0:8, _/binary>>)
    ];
-
 encode(Sock, ?XSD_ANYURI, {iri, _, _} = IRI) ->
    [either ||
-      relog:uid(Sock, IRI)
+      relog_reader:uid(Sock, IRI)
    ,  cats:unit(<<0:8, _/binary>>)
    ];
-
 encode(Sock, ?XSD_ANYURI, IRI)
  when is_binary(IRI) ->
    [either ||
-      relog:uid(Sock, IRI)
+      relog_reader:uid(Sock, IRI)
    ,  cats:unit(<<0:8, _/binary>>)
    ];
-
 encode(_, ?XSD_ANYURI, IRI)
- when IRI =:= '_' orelse is_list(IRI) ->
+ when ?whildcard(IRI) ->
    {ok, <<0:8>>};
-
 
 encode(_, ?XSD_STRING, Val)
  when is_binary(Val) ->
    {ok, <<1:8, Val/binary>>};
-
 encode(_, ?XSD_STRING, Val)
- when Val =:= '_' orelse is_list(Val) ->
+ when ?whildcard(Val) ->
    {ok, <<1:8>>};
-
 
 encode(_, ?XSD_INTEGER, Val)
  when is_integer(Val) ->
    {ok,<<2:8, Val:64>>};
-
 encode(_, ?XSD_INTEGER, Val)
- when Val =:= '_' orelse is_list(Val) ->
+ when ?whildcard(Val) ->
    {ok, <<2:8>>};
 
+encode(_, undefined, Val)
+ when ?whildcard(Val) ->
+   {ok, <<>>};
 
 encode(_, Type, Val) ->
    {error, {unsupported, Type, Val}}.
-
-%%
-%%
-encode(_, '_') ->
-   {ok, <<>>};
-
-encode(_, Val)
- when is_list(Val) ->
-   {ok, <<>>};
-
-encode(Sock, <<"iri:", IRI/binary>>) -> 
-   encode(Sock, ?XSD_ANYURI, IRI);
-
-encode(Sock, <<"iri+", IRI/binary>>) ->
-   encode(Sock, ?XSD_ANYURI, IRI);
-
-encode(Sock, Val)
- when is_binary(Val) ->
-   encode(Sock, ?XSD_STRING, Val);
-
-encode(Sock, Val)
- when is_integer(Val) ->
-   encode(Sock, ?XSD_INTEGER, Val);
-
-encode(_, Val) ->
-   {error, {unsupported, Val}}.
 
 
 %%
@@ -114,16 +116,3 @@ decode(_, <<2:8, Val:64>>) ->
 
 decode(_, <<Type:8, Val/binary>>) ->
    {error, {unsupported, Type, Val}}.
-
-
-% %%
-% %%
-% decode(Sock, ?XSD_ANYURI, Uid) ->
-%    {ok, IRI} = relog:iri(Sock, Uid),
-%    IRI;
-
-% decode(_, ?XSD_STRING, Val) ->
-%    Val;
-
-% decode(_, _, Val) ->
-%    erlang:binary_to_term(Val).

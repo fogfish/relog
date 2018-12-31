@@ -19,10 +19,26 @@
 -include_lib("semantic/include/semantic.hrl").
 
 -export([
-   iri/2
+   uid/2
+,  iri/2
 ,  match/2
 ,  stream/2
 ]).
+
+%%
+%%
+uid(Sock, {iri, Prefix, Suffix}) ->
+   uid(Sock, <<Prefix/binary, $:, Suffix/binary>>);
+uid(Sock, {iri, IRI}) ->
+   uid(Sock, IRI);
+uid(Sock, IRI)
+ when is_binary(IRI) ->
+   case eredis:q(Sock, ["HGET", "iri", IRI]) of
+      {ok, undefined} ->
+         {error, undefined};
+      {ok, Uid} ->
+         {ok, Uid}
+   end.
 
 %%
 %%
@@ -43,47 +59,44 @@ iri(Sock, Uid)
 %%
 %%
 match(Sock, #{s := S, p := P, o := O, type := Type} = Pattern) ->
-   Uid = key(Pattern),
-   {ok, Sx} = relog_codec:encode(Sock, ?XSD_ANYURI, S),
-   {ok, Px} = relog_codec:encode(Sock, ?XSD_ANYURI, P),
-   {ok, Ox} = relog_codec:encode(Sock, Type, O),
-   {Prefix, Query} = pattern(Uid, Sx, Px, Ox),
-   maps:fold(fun filter/3,
-      stream:map(
-         fun(X) -> decode(Sock, Uid, Prefix, X) end,
-         relog_stream:new(Sock, Prefix, Query)
-      ),
-      Pattern
-   );
+   case
+      [either ||
+         Sx <- relog_codec:encode(Sock, ?XSD_ANYURI, S),
+         Px <- relog_codec:encode(Sock, ?XSD_ANYURI, P),
+         Ox <- relog_codec:encode(Sock, Type, O),
+         cats:unit( pattern(key(Pattern), Sx, Px, Ox) )
+      ]
+   of
+      {ok, {Uid, Prefix, Query}} ->
+         maps:fold(fun filter/3,
+            stream:map(
+               fun(X) -> decode(Sock, Uid, Prefix, X) end,
+               relog_stream:new(Sock, Prefix, Query)
+            ),
+            Pattern
+         );
+      {error, _} ->
+         stream:new()
+   end;
 
-match(Sock, #{s := S, p := P, o := O} = Pattern) ->
-   Uid = key(Pattern),
-   {ok, Sx} = relog_codec:encode(Sock, ?XSD_ANYURI, S),
-   {ok, Px} = relog_codec:encode(Sock, ?XSD_ANYURI, P),
-   {ok, Ox} = relog_codec:encode(Sock, O),
-   {Prefix, Query} = pattern(Uid, Sx, Px, Ox),
-   maps:fold(fun filter/3,
-      stream:map(
-         fun(X) -> decode(Sock, Uid, Prefix, X) end,
-         relog_stream:new(Sock, Prefix, Query)
-      ),
-      Pattern
-   ).
+match(Sock, #{o := O} = Pattern) ->
+   match(Sock, Pattern#{type => relog_codec:typeof(O)}).
+
 
 %%
 %% encode match prefix
 pattern(spo, S, P, O) ->
-   {<<$1, S/binary>>, join(P, O)};
+   {spo, <<$1, S/binary>>, join(P, O)};
 pattern(sop, S, P, O) ->
-   {<<$2, S/binary>>, join(O, P)};
+   {sop, <<$2, S/binary>>, join(O, P)};
 pattern(pso, S, P, O) ->
-   {<<$3, P/binary>>, join(S, O)};
+   {pso, <<$3, P/binary>>, join(S, O)};
 pattern(pos, S, P, O) ->
-   {<<$4, P/binary>>, join(O, S)};
+   {pos, <<$4, P/binary>>, join(O, S)};
 pattern(ops, S, P, O) ->
-   {<<$5, O/binary>>, join(P, S)};
+   {ops, <<$5, O/binary>>, join(P, S)};
 pattern(osp, S, P, O) ->
-   {<<$6, O/binary>>, join(S, P)}.
+   {osp, <<$6, O/binary>>, join(S, P)}.
 
 join(X, <<0>>) -> X;
 join(<<0>>, Y) -> Y;
