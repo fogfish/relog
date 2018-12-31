@@ -14,6 +14,8 @@
 %%   limitations under the License.
 %%
 -module(relog_writer).
+
+-compile({parse_transform, category}).
 -include_lib("semantic/include/semantic.hrl").
 
 -export([
@@ -23,10 +25,10 @@
 
 %%
 %%
-uid(Sock, {iri, _} = IRI) ->
-   uid(Sock, relog_codec:encode_iri(IRI));
-uid(Sock, {iri, _, _} = IRI) ->
-   uid(Sock, relog_codec:encode_iri(IRI));
+uid(Sock, {iri, Prefix, Suffix}) ->
+   uid(Sock, <<Prefix/binary, $:, Suffix/binary>>);
+uid(Sock, {iri, IRI}) ->
+   uid(Sock, IRI);
 uid(Sock, IRI)
  when is_binary(IRI) ->
    case eredis:q(Sock, ["HGET", "iri", IRI]) of
@@ -54,20 +56,21 @@ uid(Sock, IRI, Uid) ->
 append(Sock, {_, _, _} = Fact, Timeout) ->
    append(Sock, semantic:typed(Fact), Timeout);
 
-append(Sock, #{s := S, p := P, o:= O, type := Type} = Fact, Timeout) ->
-   ReS = relog_codec:encode(Sock, ?XSD_ANYURI, S),
-   ReP = relog_codec:encode(Sock, ?XSD_ANYURI, P),
-   ReO = relog_codec:encode(Sock, Type, O),
-   Len = erlang:byte_size(ReO),
-   ReT = relog_codec:encode_type(Type),
-   %% @todo: validate that each index written 
-   eredis:qp(Sock, [
-      ["ZADD", <<$1, ReS/binary>>, "0", <<ReP:12/binary, ReT:8, ReO/binary>>],
-      ["ZADD", <<$2, ReS/binary>>, "0", <<ReT:8, Len:32, ReO/binary, ReP:12/binary>>],
+append(Sock, #{s := S, p := P, o := O, type := T} = Fact, Timeout) ->
+   [either ||
+      Sx <- relog_codec:encode(Sock, ?XSD_ANYURI, S),
+      Px <- relog_codec:encode(Sock, ?XSD_ANYURI, P),
+      Ox <- relog_codec:encode(Sock, T, O),
+      cats:sequence(
+         eredis:qp(Sock, [
+            ["ZADD", <<$1, Sx/binary>>, "0", <<Px:13/binary, Ox/binary>>],
+            ["ZADD", <<$2, Sx/binary>>, "0", <<Ox/binary, Px:13/binary>>],
 
-      ["ZADD", <<$3, ReP/binary>>, "0", <<ReS:12/binary, ReT:8, ReO/binary>>],
-      ["ZADD", <<$4, ReP/binary>>, "0", <<ReT:8, Len:32, ReO/binary, ReS:12/binary>>],
+            ["ZADD", <<$3, Px/binary>>, "0", <<Sx:13/binary, Ox/binary>>],
+            ["ZADD", <<$4, Px/binary>>, "0", <<Ox/binary, Sx:13/binary>>],
 
-      ["ZADD", <<$5, ReT:8, ReO/binary>>, "0", <<ReP:12/binary, ReS:12/binary>>],
-      ["ZADD", <<$6, ReT:8, ReO/binary>>, "0", <<ReS:12/binary, ReP:12/binary>>]      
-   ]).
+            ["ZADD", <<$5, Ox/binary>>, "0", <<Px:13/binary, Sx:13/binary>>],
+            ["ZADD", <<$6, Ox/binary>>, "0", <<Sx:13/binary, Px:13/binary>>]
+         ])
+      )
+   ].

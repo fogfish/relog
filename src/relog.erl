@@ -14,6 +14,7 @@
 %%   limitations under the License.
 %%
 -module(relog).
+
 -compile({parse_transform, category}).
 -include_lib("datum/include/datum.hrl").
 
@@ -30,6 +31,9 @@
 ,  jsonify/2
 ]).
 
+%%
+%% @todo
+%%   - protected against IRI/UID overflow attack
 
 -type sock() :: _.
 
@@ -48,23 +52,17 @@ socket(Host, Port) ->
 
 %%
 %% associate urn with unique identity or return existed one
--spec uid(sock(), semantic:iri()) -> datum:either( uid:l() ).
+-spec uid(sock(), semantic:iri()) -> datum:either( binary() ).
 
 uid(Sock, IRI) ->
-   [either ||
-      relog_writer:uid(Sock, IRI),
-      uid:decode(_)
-   ].
+   relog_writer:uid(Sock, IRI).
 
 %%
 %% lookup urn or uid associated with unique identity
--spec iri(sock(), uid:l()) -> datum:either( semantic:iri() ).
+-spec iri(sock(), binary()) -> datum:either( semantic:iri() ).
 
 iri(Sock, Uid) ->
-   [either ||
-      relog_reader:iri(Sock, Uid),
-      cats:unit( relog_codec:decode_iri(_) )
-   ].
+   relog_reader:iri(Sock, Uid).
 
 %%
 %% append knowledge fact 

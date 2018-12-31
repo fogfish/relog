@@ -14,6 +14,8 @@
 %%   limitations under the License.
 %%
 -module(relog_reader).
+
+-compile({parse_transform, category}).
 -include_lib("semantic/include/semantic.hrl").
 
 -export([
@@ -24,28 +26,42 @@
 
 %%
 %%
-iri(Sock, {uid, _, _, _} = Uid) ->
-   iri(Sock, uid:encode(Uid));
-
 iri(Sock, Uid)
  when is_binary(Uid) ->
    case eredis:q(Sock, ["HGET", "uid", Uid]) of
       {ok, undefined} ->   
-         {ok, Uid};
+         {ok, {iri, Uid}};
       {ok, IRI} ->
-         {ok, IRI}
+         case semantic:compact(IRI) of
+            undefined ->
+               {ok, semantic:absolute(IRI)};
+            Semantic ->
+               {ok, Semantic}
+         end
    end.
 
 %%
 %%
 match(Sock, #{s := S, p := P, o := O, type := Type} = Pattern) ->
-   Uid = index_of(Pattern),
-   {Prefix, Query} = pattern(Uid,
-      relog_codec:encode(Sock, ?XSD_ANYURI, S),
-      relog_codec:encode(Sock, ?XSD_ANYURI, P),
-      relog_codec:encode(Sock, Type, O),
-      relog_codec:encode_type(Type)
-   ),
+   Uid = key(Pattern),
+   {ok, Sx} = relog_codec:encode(Sock, ?XSD_ANYURI, S),
+   {ok, Px} = relog_codec:encode(Sock, ?XSD_ANYURI, P),
+   {ok, Ox} = relog_codec:encode(Sock, Type, O),
+   {Prefix, Query} = pattern(Uid, Sx, Px, Ox),
+   maps:fold(fun filter/3,
+      stream:map(
+         fun(X) -> decode(Sock, Uid, Prefix, X) end,
+         relog_stream:new(Sock, Prefix, Query)
+      ),
+      Pattern
+   );
+
+match(Sock, #{s := S, p := P, o := O} = Pattern) ->
+   Uid = key(Pattern),
+   {ok, Sx} = relog_codec:encode(Sock, ?XSD_ANYURI, S),
+   {ok, Px} = relog_codec:encode(Sock, ?XSD_ANYURI, P),
+   {ok, Ox} = relog_codec:encode(Sock, O),
+   {Prefix, Query} = pattern(Uid, Sx, Px, Ox),
    maps:fold(fun filter/3,
       stream:map(
          fun(X) -> decode(Sock, Uid, Prefix, X) end,
@@ -56,49 +72,52 @@ match(Sock, #{s := S, p := P, o := O, type := Type} = Pattern) ->
 
 %%
 %% encode match prefix
-pattern(spo, S, P, O, T) ->
-   {<<$1, S/binary>>, <<P/binary, T:8, O/binary>>};
-pattern(sop, S, P, O, T) ->
-   {<<$2, S/binary>>, <<(object(T, O))/binary, P/binary>>};
-pattern(pso, S, P, O, T) ->
-   {<<$3, P/binary>>, <<S/binary, T:8, O/binary>>};
-pattern(pos, S, P, O, T) ->
-   {<<$4, P/binary>>, <<(object(T, O))/binary, S/binary>>};
-pattern(ops, S, P, O, T) ->
-   {<<$5, T, O/binary>>, <<P/binary, S/binary>>};
-pattern(osp, S, P, O, T) ->
-   {<<$6, T, O/binary>>, <<S/binary, P/binary>>}.
+pattern(spo, S, P, O) ->
+   {<<$1, S/binary>>, join(P, O)};
+pattern(sop, S, P, O) ->
+   {<<$2, S/binary>>, join(O, P)};
+pattern(pso, S, P, O) ->
+   {<<$3, P/binary>>, join(S, O)};
+pattern(pos, S, P, O) ->
+   {<<$4, P/binary>>, join(O, S)};
+pattern(ops, S, P, O) ->
+   {<<$5, O/binary>>, join(P, S)};
+pattern(osp, S, P, O) ->
+   {<<$6, O/binary>>, join(S, P)}.
 
-object(T, <<>>) -> <<T:8>>;
-object(T, O) -> <<T:8, (erlang:byte_size(O)):32, O/binary>>.
-
+join(X, <<0>>) -> X;
+join(<<0>>, Y) -> Y;
+join(X,     Y) -> <<X/binary, Y/binary>>.
 
 %%
 %%
-decode(Sock, spo, <<$1, S/binary>>, <<P:12/binary, T:8, O/binary>>) ->
-   decode(Sock, S, P, O, relog_codec:decode_type(T));
-decode(Sock, sop, <<$2, S/binary>>, <<T:8, Len:32, Suffix/binary>>) ->
-   <<O:Len/binary, P:12/binary>> = Suffix,
-   decode(Sock, S, P, O, relog_codec:decode_type(T));
-decode(Sock, pso, <<$3, P/binary>>, <<S:12/binary, T:8, O:12/binary>>) ->
-   decode(Sock, S, P, O, relog_codec:decode_type(T));
-decode(Sock, sop, <<$4, P/binary>>, <<T:8, Len:32, Suffix/binary>>) ->
-   <<O:Len/binary, S:12/binary>> = Suffix,
-   decode(Sock, S, P, O, relog_codec:decode_type(T));
-decode(Sock, ops, <<$5, T:8, O/binary>>, <<P:12/binary, S/binary>>) ->
-   decode(Sock, S, P, O, relog_codec:decode_type(T));
-decode(Sock, osp, <<$6, T:8, O/binary>>, <<S:12/binary, P/binary>>) ->
-   decode(Sock, S, P, O, relog_codec:decode_type(T)).
+decode(Sock, spo, <<$1, S:13/binary>>, <<P:13/binary, O/binary>>) ->
+   decode1(Sock, S, P, O);
 
-decode(Sock, S, P, O, Type) ->
-   #{
-      s => relog_codec:decode(Sock, ?XSD_ANYURI, S)
-   ,  p => relog_codec:decode(Sock, ?XSD_ANYURI, P)
-   ,  o => relog_codec:decode(Sock, Type, O)
-   ,  c => 1.0
-   ,  k => uid:encode64( uid:l() )
-   ,  type => Type
-   }.
+decode(Sock, sop, <<$2, S:13/binary>>, Value) ->
+   Len = byte_size(Value) - 13,
+   <<O:Len/binary, P:13/binary>> = Value,
+   decode1(Sock, S, P, O);
+
+decode(Sock, pso, <<$3, P:13/binary>>, <<S:13/binary, O:13/binary>>) ->
+   decode1(Sock, S, P, O);
+
+decode(Sock, sop, <<$4, P:13/binary>>, Value) ->
+   Len = byte_size(Value) - 13,
+   <<O:Len/binary, S:13/binary>> = Value,
+   decode1(Sock, S, P, O);
+
+decode(Sock, ops, <<$5, O/binary>>, <<P:13/binary, S:13/binary>>) ->
+   decode1(Sock, S, P, O);
+
+decode(Sock, osp, <<$6, O/binary>>, <<S:13/binary, P:13/binary>>) ->
+   decode1(Sock, S, P, O).
+
+decode1(Sock, Sx, Px, Ox) ->
+   {ok, _, S} = relog_codec:decode(Sock, Sx),
+   {ok, _, P} = relog_codec:decode(Sock, Px),
+   {ok, T, O} = relog_codec:decode(Sock, Ox),
+   #{s => S, p => P, o => O, c => 1.0, k => uid:encode64(uid:l()), type => T}.
 
 %%
 %%
@@ -128,76 +147,82 @@ check('=<', A, B) -> A =< B.
 -define(is_pat(X), (not is_list(X) andalso X /= '_')).
 -define(ord(X, Y), (is_list(X) andalso is_list(Y) andalso length(X) > length(Y))).
 
-
-index_of(#{s := S, p := P})
+key(#{s := S, p := P})
  when ?is_pat(S), ?is_pat(P) -> 
    spo;
-index_of(#{s := S, o := O})
+key(#{s := S, o := O})
  when ?is_pat(S), ?is_pat(O) ->
    sop;
-index_of(#{p := P, o := O})
+key(#{p := P, o := O})
  when ?is_pat(P), ?is_pat(O) -> 
    ops;
 
-index_of(#{s := S, p := P, o := O})
+key(#{s := S, p := P, o := O})
  when ?is_pat(S), ?ord(P, O) ->
-   sop;
-index_of(#{s := S, p := P, o := O})
+   spo;
+key(#{s := S, p := P, o := O})
  when ?is_pat(S), ?ord(O, P) ->
    sop;
-index_of(#{s := S, o := _})
+key(#{s := S, p := _})
+ when ?is_pat(S) ->
+   spo;
+key(#{s := S, o := _})
  when ?is_pat(S) ->
    sop;
-index_of(#{s := S, p := _})
- when ?is_pat(S) ->
-   spo;
 
-index_of(#{s := S, p := P, o := O})
+key(#{s := S, p := P, o := O})
  when ?is_pat(P), ?ord(S, O) ->
-   pos;
-index_of(#{s := S, p := P, o := O})
+   pso;
+key(#{s := S, p := P, o := O})
  when ?is_pat(P), ?ord(O, S) ->
    pos;
-index_of(#{p := P, o := _})
+key(#{s := _, p := P})
+ when ?is_pat(P) ->
+   pso;
+key(#{p := P, s := _})
  when ?is_pat(P) ->
    pos;
-index_of(#{s := _, p := P})
- when ?is_pat(P) ->
-   pso;
 
-index_of(#{s := S, p := P, o := O})
+key(#{s := S, p := P, o := O})
  when ?is_pat(O), ?ord(S, P) ->
    osp;
-index_of(#{s := S, p := P, o := O})
+key(#{s := S, p := P, o := O})
  when ?is_pat(O), ?ord(P, S) ->
    ops;
-index_of(#{s := _, o := O})
+key(#{s := _, o := O})
  when ?is_pat(O) ->
    osp;
-index_of(#{p := _, o := O})
+key(#{p := _, o := O})
  when ?is_pat(O) ->
    ops;
 
-index_of(#{s := _}) ->
+key(#{s := _}) ->
    spo;
 
-index_of(#{p := _}) ->
+key(#{p := _}) ->
    pso;
 
-index_of(#{o := _}) ->
+key(#{o := _}) ->
    ops;
 
-index_of(_) ->
+key(_) ->
    spo.
+
 
 %%
 %%
+stream([], [S, P, O]) ->
+   fun(Sock) ->
+      stream:map(
+         fun(#{s := Xs, p := Xp, o := Xo}) -> [Xs, Xp, Xo] end,
+         relog:match(Sock, #{s => S, p => P, o => O})
+      )
+   end;
+
 stream([Type], [S, P, O]) ->
    fun(Sock) ->
       stream:map(
-         fun(#{s := Xs, p := Xp, o := Xo}) -> 
-            [Xs, Xp, Xo] 
-         end,
+         fun(#{s := Xs, p := Xp, o := Xo}) -> [Xs, Xp, Xo] end,
          relog:match(Sock, #{s => S, p => P, o => O, type => semantic:compact(Type)})
       )
    end.
