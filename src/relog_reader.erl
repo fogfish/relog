@@ -112,7 +112,7 @@ decode(Sock, sop, <<$2, S:13/binary>>, Value) ->
    <<O:Len/binary, P:13/binary>> = Value,
    decode1(Sock, S, P, O);
 
-decode(Sock, pso, <<$3, P:13/binary>>, <<S:13/binary, O:13/binary>>) ->
+decode(Sock, pso, <<$3, P:13/binary>>, <<S:13/binary, O/binary>>) ->
    decode1(Sock, S, P, O);
 
 decode(Sock, sop, <<$4, P:13/binary>>, Value) ->
@@ -157,7 +157,7 @@ check('=<', A, B) -> A =< B.
 
 %%
 %% index selector
--define(is_pat(X), (not is_list(X) andalso X /= '_')).
+-define(is_pat(X), (not is_list(X) andalso X /= '_' andalso X /= undefined)).
 -define(ord(X, Y), (is_list(X) andalso is_list(Y) andalso length(X) > length(Y))).
 
 key(#{s := S, p := P})

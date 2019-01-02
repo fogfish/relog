@@ -27,7 +27,7 @@
 ,  decode/2
 ]).
 
--define(whildcard(X), (X =:= '_' orelse is_list(X))).
+-define(whildcard(X), (X =:= '_' orelse X =:= undefined orelse is_list(X))).
 
 %%
 %%
@@ -35,6 +35,9 @@ typeof(<<"iri:", _/binary>>) -> ?XSD_ANYURI;
 typeof(<<"iri+", _/binary>>) -> ?XSD_ANYURI;
 typeof(X) when is_binary(X)  -> ?XSD_STRING; 
 typeof(X) when is_integer(X) -> ?XSD_INTEGER;
+typeof(X) when is_float(X)   -> ?XSD_DECIMAL;
+typeof(true) -> ?XSD_BOOLEAN;
+typeof(false) -> ?XSD_BOOLEAN;
 typeof(_) -> undefined. 
 
 %%

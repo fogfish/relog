@@ -21,6 +21,7 @@
 -export([start/0]).
 -export([
    socket/2
+,  close/1
 ,  uid/2
 ,  iri/2
 ,  append/2
@@ -46,6 +47,9 @@ start() ->
 
 socket(Host, Port) ->
    eredis:start_link(Host, Port).
+
+close(Sock) ->
+   eredis:stop(Sock).
 
 %%
 %% associate urn with unique identity or return existed one

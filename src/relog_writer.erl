@@ -71,6 +71,6 @@ append(Sock, #{s := S, p := P, o := O, type := T} = Fact, Timeout) ->
 
             ["ZADD", <<$5, Ox/binary>>, "0", <<Px:13/binary, Sx:13/binary>>],
             ["ZADD", <<$6, Ox/binary>>, "0", <<Sx:13/binary, Px:13/binary>>]
-         ])
+         ], Timeout)
       )
    ].

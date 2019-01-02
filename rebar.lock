@@ -1,0 +1,30 @@
+{"1.1.0",
+[{<<"datalog">>,{pkg,<<"datalog">>,<<"1.2.2">>},0},
+ {<<"datum">>,{pkg,<<"datum">>,<<"4.5.0">>},0},
+ {<<"eredis">>,{pkg,<<"eredis">>,<<"1.2.0">>},0},
+ {<<"feta">>,
+  {git,"https://github.com/fogfish/feta",
+       {ref,"c5d251b3f995b96afd5e8ec7da61516842aa658c"}},
+  1},
+ {<<"hash">>,
+  {git,"https://github.com/fogfish/hash",
+       {ref,"a1b9101189e115b4eabbe941639f3c626614e986"}},
+  1},
+ {<<"jsx">>,{pkg,<<"jsx">>,<<"2.9.0">>},1},
+ {<<"meck">>,{pkg,<<"meck">>,<<"0.8.12">>},2},
+ {<<"semantic">>,
+  {git,"https://github.com/fogfish/semantic",
+       {ref,"6db551b5bbf9785bc6a168b5726ecc65638e8b06"}},
+  0},
+ {<<"uid">>,
+  {git,"https://github.com/fogfish/uid",
+       {ref,"698ebcb27b273a2f879d8bd24be5f5ea54c98850"}},
+  1}]}.
+[
+{pkg_hash,[
+ {<<"datalog">>, <<"F9F0434CDFD722304DAFF7BAA036221949968754B9B35109C85304D4A2496D41">>},
+ {<<"datum">>, <<"0F7F064A509632C70448F9BC7E7295BD5F9CD6E3207863B176416EF14FD19E0C">>},
+ {<<"eredis">>, <<"0B8E9CFC2C00FA1374CD107EA63B49BE08D933DF2CF175E6A89B73DD9C380DE4">>},
+ {<<"jsx">>, <<"D2F6E5F069C00266CAD52FB15D87C428579EA4D7D73A33669E12679E203329DD">>},
+ {<<"meck">>, <<"1F7B1A9F5D12C511848FEC26BBEFD09A21E1432EADB8982D9A8ACEB9891A3CF2">>}]}
+].
