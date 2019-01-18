@@ -1,0 +1,29 @@
+<http://www.w3.org/2001/XMLSchema#anyURI> <http://www.w3.org/2001/XMLSchema#anyURI> <http://example.com/a> .
+
+<http://www.w3.org/2001/XMLSchema#string> <http://www.w3.org/2001/XMLSchema#string> "example"^^<http://www.w3.org/2001/XMLSchema#string> .
+
+<http://www.w3.org/2001/XMLSchema#integer> <http://www.w3.org/2001/XMLSchema#integer> "123"^^<http://www.w3.org/2001/XMLSchema#integer> .
+
+<http://www.w3.org/2001/XMLSchema#decimal> <http://www.w3.org/2001/XMLSchema#decimal> "12.3"^^<http://www.w3.org/2001/XMLSchema#decimal> .
+
+<http://www.w3.org/2001/XMLSchema#boolean> <http://www.w3.org/2001/XMLSchema#boolean> "true"^^<http://www.w3.org/2001/XMLSchema#boolean> .
+
+<http://www.w3.org/2001/XMLSchema#dateTime> <http://www.w3.org/2001/XMLSchema#dateTime> "2001-08-08T10:15:30Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+
+<http://www.w3.org/2001/XMLSchema#date> <http://www.w3.org/2001/XMLSchema#date> "2001-08-08"^^<http://www.w3.org/2001/XMLSchema#date> .
+
+<http://www.w3.org/2001/XMLSchema#time> <http://www.w3.org/2001/XMLSchema#time> "10:15:30Z"^^<http://www.w3.org/2001/XMLSchema#time> .
+
+<http://www.w3.org/2001/XMLSchema#gYearMonth> <http://www.w3.org/2001/XMLSchema#gYearMonth> "2001-08"^^<http://www.w3.org/2001/XMLSchema#gYearMonth> .
+
+<http://www.w3.org/2001/XMLSchema#gMonthDay> <http://www.w3.org/2001/XMLSchema#gMonthDay> "--08-08"^^<http://www.w3.org/2001/XMLSchema#gMonthDay> .
+
+<http://www.w3.org/2001/XMLSchema#gYear> <http://www.w3.org/2001/XMLSchema#gYear> "2001"^^<http://www.w3.org/2001/XMLSchema#gYear> .
+
+<http://www.w3.org/2001/XMLSchema#gMonth> <http://www.w3.org/2001/XMLSchema#gMonth> "08"^^<http://www.w3.org/2001/XMLSchema#gMonth> .
+
+<http://www.w3.org/2001/XMLSchema#gDay> <http://www.w3.org/2001/XMLSchema#gDay> "08"^^<http://www.w3.org/2001/XMLSchema#gDay> .
+
+<http://www.georss.org/georss/point> <http://www.georss.org/georss/point> "60.1,23.2"^^<http://www.georss.org/georss/point> .
+
+<http://www.georss.org/georss/hash> <http://www.georss.org/georss/hash> "ueh6xcb"^^<http://www.georss.org/georss/hash> .

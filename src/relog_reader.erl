@@ -59,11 +59,13 @@ iri(Sock, Uid)
 %%
 %%
 match(Sock, #{s := S, p := P, o := O, type := Type} = Pattern) ->
+   io:format("==> ~p~n", [Pattern]),
    case
       [either ||
          Sx <- relog_codec:encode(Sock, ?XSD_ANYURI, S),
          Px <- relog_codec:encode(Sock, ?XSD_ANYURI, P),
          Ox <- relog_codec:encode(Sock, Type, O),
+         io:format("==> ~p ~p ~p ~p~n", [key(Pattern), Sx, Px, Ox]),
          cats:unit( pattern(key(Pattern), Sx, Px, Ox) )
       ]
    of
@@ -75,12 +77,15 @@ match(Sock, #{s := S, p := P, o := O, type := Type} = Pattern) ->
             ),
             Pattern
          );
-      {error, _} ->
+      {error, Reason} ->
+         io:format("=[ err ]=> ~p~n", [Reason]),
          stream:new()
    end;
 
+match(Sock, #{o := '_'} = Pattern) ->
+   match(Sock, Pattern#{type => undefined});
 match(Sock, #{o := O} = Pattern) ->
-   match(Sock, Pattern#{type => relog_codec:typeof(O)}).
+   match(Sock, Pattern#{type => semantic:typeof(O)}).
 
 
 %%
@@ -130,6 +135,7 @@ decode1(Sock, Sx, Px, Ox) ->
    {ok, _, S} = relog_codec:decode(Sock, Sx),
    {ok, _, P} = relog_codec:decode(Sock, Px),
    {ok, T, O} = relog_codec:decode(Sock, Ox),
+   io:format("=[ dec ]=> ~p -> ~p ~p~n", [Ox, T, O]),
    #{s => S, p => P, o => O, c => 1.0, k => uid:encode64(uid:l()), type => T}.
 
 %%
@@ -224,18 +230,19 @@ key(_) ->
 
 %%
 %%
-stream([], [S, P, O]) ->
-   fun(Sock) ->
-      stream:map(
-         fun(#{s := Xs, p := Xp, o := Xo}) -> [Xs, Xp, Xo] end,
-         relog:match(Sock, #{s => S, p => P, o => O})
-      )
-   end;
-
 stream([Type], [S, P, O]) ->
    fun(Sock) ->
       stream:map(
          fun(#{s := Xs, p := Xp, o := Xo}) -> [Xs, Xp, Xo] end,
          relog:match(Sock, #{s => S, p => P, o => O, type => semantic:compact(Type)})
       )
+   end;
+
+stream(_, [S, P, O]) ->
+   fun(Sock) ->
+      stream:map(
+         fun(#{s := Xs, p := Xp, o := Xo}) -> [Xs, Xp, Xo] end,
+         relog:match(Sock, #{s => S, p => P, o => O})
+      )
    end.
+

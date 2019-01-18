@@ -27,3 +27,32 @@ The library requires Redis as a storage back-end. Use the docker container for d
 ```bash
 docker run -p 6379:6379 -d redis
 ```
+
+
+#### Basic queries
+
+Match a person from dataset using query goals
+
+```erlang
+%%
+%% define a query goal to match a person with `name` equal to `Ridley Scott`.
+%% An identity rule is used to produce stream of tuples 
+Q = "
+   ?- person(_, \"Ridley Scott\").
+
+   f(s, p, o).
+
+   person(id, name) :- f(id, schema:name, name).
+".
+
+%%
+%% parse and compile a query into executable function
+F = relog:c(Q).
+
+%%
+%% apply the function to dataset and materialize a stream of tuple, it returns
+%% [
+%%    [{iri,<<"http://example.org/person/137">>}, <<"Ridley Scott">>]
+%% ]
+stream:list(F(Sock)).
+```
