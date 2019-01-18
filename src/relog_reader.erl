@@ -59,13 +59,11 @@ iri(Sock, Uid)
 %%
 %%
 match(Sock, #{s := S, p := P, o := O, type := Type} = Pattern) ->
-   io:format("==> ~p~n", [Pattern]),
    case
       [either ||
          Sx <- relog_codec:encode(Sock, ?XSD_ANYURI, S),
          Px <- relog_codec:encode(Sock, ?XSD_ANYURI, P),
          Ox <- relog_codec:encode(Sock, Type, O),
-         io:format("==> ~p ~p ~p ~p~n", [key(Pattern), Sx, Px, Ox]),
          cats:unit( pattern(key(Pattern), Sx, Px, Ox) )
       ]
    of
@@ -78,7 +76,6 @@ match(Sock, #{s := S, p := P, o := O, type := Type} = Pattern) ->
             Pattern
          );
       {error, Reason} ->
-         io:format("=[ err ]=> ~p~n", [Reason]),
          stream:new()
    end;
 
@@ -135,7 +132,6 @@ decode1(Sock, Sx, Px, Ox) ->
    {ok, _, S} = relog_codec:decode(Sock, Sx),
    {ok, _, P} = relog_codec:decode(Sock, Px),
    {ok, T, O} = relog_codec:decode(Sock, Ox),
-   io:format("=[ dec ]=> ~p -> ~p ~p~n", [Ox, T, O]),
    #{s => S, p => P, o => O, c => 1.0, k => uid:encode64(uid:l()), type => T}.
 
 %%
