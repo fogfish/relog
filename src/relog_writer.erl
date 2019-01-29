@@ -56,7 +56,7 @@ uid(Sock, IRI, Uid) ->
 append(Sock, {_, _, _} = Fact, Timeout) ->
    append(Sock, semantic:typed(Fact), Timeout);
 
-append(Sock, #{s := S, p := P, o := O, type := T} = Fact, Timeout) ->
+append(Sock, #{s := S, p := P, o := O, type := T}, Timeout) ->
    [either ||
       Sx <- relog_codec:create(Sock, ?XSD_ANYURI, S),
       Px <- relog_codec:create(Sock, ?XSD_ANYURI, P),

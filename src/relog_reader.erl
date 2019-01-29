@@ -75,7 +75,7 @@ match(Sock, #{s := S, p := P, o := O, type := Type} = Pattern) ->
             ),
             Pattern
          );
-      {error, Reason} ->
+      {error, _Reason} ->
          stream:new()
    end;
 

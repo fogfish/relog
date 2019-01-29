@@ -1,7 +1,7 @@
 {"1.1.0",
 [{<<"datalog">>,
   {git,"https://github.com/fogfish/datalog",
-       {ref,"16813e99f1a1fdb10b422253c8f61344d9ff5978"}},
+       {ref,"c0a217121c7a136d6bce34c1906eae6a1e5124a4"}},
   0},
  {<<"datum">>,{pkg,<<"datum">>,<<"4.5.0">>},0},
  {<<"eredis">>,{pkg,<<"eredis">>,<<"1.2.0">>},0},
@@ -17,7 +17,7 @@
  {<<"meck">>,{pkg,<<"meck">>,<<"0.8.12">>},2},
  {<<"semantic">>,
   {git,"https://github.com/fogfish/semantic",
-       {ref,"3b7aa85234086f6f858bd44940a8abbe9a43e76e"}},
+       {ref,"2b1f524e587839025ddace0a03b546319988e869"}},
   0},
  {<<"uid">>,{pkg,<<"uid">>,<<"1.3.3">>},1}]}.
 [
